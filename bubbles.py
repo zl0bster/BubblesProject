@@ -1,3 +1,10 @@
+# pip install simple-draw
+# pip install split
+# pip install pywin32
+# --------------------
+# pip install -r requirements.txt
+
+
 import random
 import time
 from operator import itemgetter
@@ -11,7 +18,8 @@ import transform_decart_ang as tda
 
 
 class Screen:
-    """Keeps list of all screen objects and resolution"""
+    """Keeps list of all screen objects and resolution ond manages all its items
+    provides movement, drawing, checking collisions and user interaction"""
 
     def __init__(self, x_size=800, y_size=600):
         width = GetSystemMetrics(0)
@@ -24,7 +32,7 @@ class Screen:
         self.lastObjectId = 0
         # self.contacting_items = {}
         sd.resolution = (self.x_resolution, self.y_resolution)
-        self.draw_screen_background()
+        # self.draw_screen_background()
         sd.take_background()
 
     def draw_screen_background(self):
@@ -39,15 +47,15 @@ class Screen:
         if isinstance(mov_item, MobileObject):
             self.mobile_objects.append(mov_item)
 
+    def add_stationary_item(self, stat_item):
+        if isinstance(stat_item, ScreenObject) and not isinstance(stat_item, MobileObject):
+            self.static_objects.append(stat_item)
+
     def remove_mobile_item(self, mov_item):
         if isinstance(mov_item, MobileObject):
             itemName = id(mov_item)
             self.mobile_objects.remove(mov_item)
             print(f'Mobile item {itemName} removed')
-
-    def add_stationary_item(self, stat_item):
-        if isinstance(stat_item, ScreenObject) and not isinstance(stat_item, MobileObject):
-            self.static_objects.append(stat_item)
 
     def move_mobile_items(self):
         for dinObj in self.mobile_objects:
@@ -205,11 +213,13 @@ class Screen:
             balls -= 1
 
     def stat_items_issue(self, ignore=None):
+        '''generates all stat items of screen object excepting ignored one'''
         for item in self.static_objects:
-            if not item is ignore:
+            if item is not ignore:
                 yield item
 
     def mob_items_issue(self, ignore=None):
+        '''generates all mobile items of screen object excepting ignored one'''
         for item in self.mobile_objects:
             if not item is ignore:
                 yield item
@@ -220,7 +230,7 @@ class Screen:
     def get_max_coordinate(self):
         return max(x_resolution, y_resolution)
 
-    def get_object_id(self):
+    def get_new_object_id(self):
         self.lastObjectId += 1
         return self.lastObjectId
 
@@ -231,6 +241,7 @@ class ScreenObject:
     BALLTYPE = 10
     BLOCKTYPE = 20
     WALLTYPE = 30
+    VOIDTYPE = 0
 
     def __init__(self, reference: list, relation: list, dimensions: list):
         self.set_position(reference)
@@ -239,8 +250,8 @@ class ScreenObject:
         self.set_width(1)
         self.isRemovable = False
         self.tillRemove = 10
-        self.objectId = window.get_object_id()
-        self.objectType = 0
+        self.objectId = window.get_new_object_id()
+        self.objectType = self.VOIDTYPE
 
     def set_dimensions(self, relation: list, dimensions: list):
         self.xRelation = relation[0]
@@ -263,6 +274,14 @@ class ScreenObject:
     def set_obj_type(self, objType: int):
         self.objectType = objType
 
+    def set_lifetime(self, x=10):
+        self.isRemovable = True
+        self.tillRemove = x
+
+
+    def set_radius(self, radius:int):
+        pass
+
     def draw_item(self):
         pass
 
@@ -270,6 +289,9 @@ class ScreenObject:
         pass
 
     def import_data(self):
+        pass
+
+    def get_radius(self):
         pass
 
     def get_position(self):
@@ -326,7 +348,6 @@ class ScreenObject:
                     self.set_radius(int(0.9 * self.get_radius()))
                     if self.get_radius() < 5:
                         self.set_radius(5)
-                    self.speedValue = int(self.speedValue / 0.9)
                     self.set_width(int(0.1 * self.get_radius()))
             if self.tillRemove < 1:
                 return True
@@ -334,13 +355,9 @@ class ScreenObject:
                 self.tillRemove -= 1
         return False
 
-    def set_lifetime(self, x=10):
-        self.isRemovable = True
-        self.tillRemove = x
-
 
 class MobileObject(ScreenObject):
-    """changes its coordinates, checks collision
+    """Any screen item that changes its coordinates, checks collision
     draws itself"""
 
     def __init__(self, reference: list, relation: list, dimensions: list):
@@ -560,10 +577,6 @@ class Ball(MobileObject):
         self.screen_object_init(x0=x0, y0=y0, x_lim=x_max, y_lim=y_max)
         self.mobile_object_init()
         return
-
-
-# =================================================================================
-
 
 # =====================================================================================
 

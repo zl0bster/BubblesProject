@@ -1,0 +1,4 @@
+pygame==2.0.0.dev8
+pywin32==228
+simple-draw==2.6.8
+split==0.4
