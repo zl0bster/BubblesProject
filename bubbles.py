@@ -82,7 +82,8 @@ class Screen:
             print(f"log file {logFileName} is closed")
 
     def manage_mobile_items_collisions(self):
-        impulseCoef = 1.00
+        IMPULSE_COEF = 1.00
+        MIN_SPEED = 3
 
         def mobObjectChangeSpeedDirection(item: MobileObject, normalVector):
             [speedValue, direction] = item.get_speed()
@@ -99,8 +100,8 @@ class Screen:
             item1Radius = item1.xRelation
             item2SpeedVal, item2SpeedDir = item2.get_speed()
             item2Radius = item2.xRelation
-            item1NewSpeed = max(int(round(item2Radius / item1Radius * item2SpeedVal * impulseCoef)), 2)
-            item2NewSpeed = max(int(round(item1Radius / item2Radius * item1SpeedVal * impulseCoef)), 2)
+            item1NewSpeed = max(int(round(item2Radius / item1Radius * item2SpeedVal * IMPULSE_COEF)), MIN_SPEED)
+            item2NewSpeed = max(int(round(item1Radius / item2Radius * item1SpeedVal * IMPULSE_COEF)), MIN_SPEED)
             item1.set_speed(item1NewSpeed, item1SpeedDir)
             item2.set_speed(item2NewSpeed, item2SpeedDir)
 
@@ -112,9 +113,9 @@ class Screen:
                         mobObjectChangeSpeedDirection(item=mobObj, normalVector=normalVector)
                         mobObj.speedValue = int(round(mobObj.speedValue * 1.02))
                         mobObj.set_contact()
-                        if mobObj.is_to_remove_now():
+                        if mobObj.is_to_die_now():
                             mobObj.die()
-                        if statObj.is_to_remove_now():
+                        if statObj.is_to_die_now():
                             statObj.block_init(x_resolution, y_resolution)
                 else:
                     mobObj.lost_contact()
@@ -134,12 +135,12 @@ class Screen:
                     if mobObj1.was_contact() == 0:
                         mobObjectChangeSpeedDirection(item=mobObj1, normalVector=normalVector)
                         mobObj1.set_contact()
-                        if mobObj1.is_to_remove_now():
+                        if mobObj1.is_to_die_now():
                             mobObj1.die()
                     if mobObj2.was_contact() == 0:
                         mobObjectChangeSpeedDirection(item=mobObj2, normalVector=normalVector)
                         mobObj2.set_contact()
-                        if mobObj2.is_to_remove_now():
+                        if mobObj2.is_to_die_now():
                             mobObj2.die()
                 else:
                     mobObj1.lost_contact()
@@ -278,8 +279,7 @@ class ScreenObject:
         self.isRemovable = True
         self.tillRemove = x
 
-
-    def set_radius(self, radius:int):
+    def set_radius(self, radius: int):
         pass
 
     def draw_item(self):
@@ -339,11 +339,10 @@ class ScreenObject:
     def is_removable(self):
         return self.isRemovable
 
-    def is_to_remove_now(self):
+    def is_to_die_now(self):
         if self.isRemovable:
             if self.tillRemove < 10:
                 self.set_color(sd.COLOR_RED)
-                # self.set_width(3)
                 if type(self) is Ball:
                     self.set_radius(int(0.9 * self.get_radius()))
                     if self.get_radius() < 5:
@@ -495,7 +494,7 @@ class MobileObject(ScreenObject):
 
     def is_immovable(self):
         if self.speedValue < 1:
-            return self.is_to_remove_now()
+            return self.is_to_die_now()
 
 
 class Block(ScreenObject):
@@ -541,7 +540,7 @@ class Ball(MobileObject):
     def draw_item(self):
         self.referencePoint = sd.get_point(x=self.xPosition, y=self.yPosition)
         if self.wasContactBefore > 0:
-            color = sd.COLOR_RED
+            color = sd.COLOR_DARK_RED
             width = 5
         else:
             color = self.color
@@ -563,10 +562,8 @@ class Ball(MobileObject):
         print(f"Ball {self.get_obj_id()} initialized")
 
     def set_radius(self, radius):
-        self.xRelation = radius
-        self.yRelation = radius
-        self.xDimension = radius * 2
-        self.yDimension = self.xDimension
+        diameter = 2 * radius
+        self.set_dimensions([radius, radius], [diameter, diameter])
 
     def ball_reset_position(self, x_lim, y_lim):
         wall_thickness = 5
@@ -577,6 +574,7 @@ class Ball(MobileObject):
         self.screen_object_init(x0=x0, y0=y0, x_lim=x_max, y_lim=y_max)
         self.mobile_object_init()
         return
+
 
 # =====================================================================================
 
