@@ -17,6 +17,12 @@ from win32api import GetSystemMetrics
 import fractal_tree_draw as fd
 import transform_decart_ang as tda
 
+# todo refactor screen objects constructors
+# todo provide balls birth place while screen init
+# todo move screen class definition to another module
+# todo move screen objects definition to another file
+# todo try to move screen creation to another file
+
 
 def main():
     parser = parserDefinition()
