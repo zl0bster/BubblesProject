@@ -5,6 +5,7 @@
 # pip install -r requirements.txt
 
 
+import argparse
 import random
 import time
 from operator import itemgetter
@@ -15,6 +16,36 @@ from win32api import GetSystemMetrics
 
 import fractal_tree_draw as fd
 import transform_decart_ang as tda
+
+
+def main():
+    parser = parserDefinition()
+    args = parser.parse_args()
+    x_resolution = args.xres
+    y_resolution = args.yres
+    window = Screen(x_size=x_resolution, y_size=y_resolution)
+    ballsN = 30
+    blocksN = 4
+    if args.mode == 'r':
+        ballsN = args.nba
+        blocksN = args.nbr
+    window.screen_init(balls=ballsN, blocks=blocksN, wallWidth=4)
+    while not sd.user_want_exit():
+        window.do()
+    sd.quit()
+
+
+def parserDefinition():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-x', '--xres', help='window x resolution', type=int, default=1600)
+    parser.add_argument('-y', '--yres', help='window y resolution', type=int, default=950)
+    subparsers = parser.add_subparsers(dest='mode')
+    randParser = subparsers.add_parser('r')
+    randParser.add_argument('-nba', help='number of balls', type=int, required=True)
+    randParser.add_argument('-nbr', help='number of bricks', type=int, required=True)
+    defParser = subparsers.add_parser('d')
+    defParser.add_argument('-file', type=argparse.FileType('r'), help='scene config file path', required=True)
+    return parser
 
 
 class Screen:
@@ -105,6 +136,7 @@ class Screen:
             item1.set_speed(item1NewSpeed, item1SpeedDir)
             item2.set_speed(item2NewSpeed, item2SpeedDir)
 
+        x_resolution, y_resolution = self.get_resolution()
         for statObj in self.static_objects:
             for mobObj in self.mobile_objects:
                 [isContact, normalVector] = mobObj.check_contact(statObj)
@@ -195,19 +227,19 @@ class Screen:
                       [(x_lim - 1 - wallWidth, 0), (x_lim - 1, y_lim - 1)],
                       [(wallWidth, y_lim - 1 - wallWidth), (x_lim - wallWidth, y_lim - 1)]]
         for wall in wallBlocks:
-            self.add_stationary_item(Block(wall[0], wall[1]))
+            self.add_stationary_item(Block(wall[0], wall[1]), self)
             print('wall block', id(wall), 'added')
         for wallBlock in self.static_objects:
             wallBlock.set_width(2)
             wallBlock.set_obj_type(wallBlock.WALLTYPE)
         while blocks > 0:
-            block1 = Block()
+            block1 = Block(parent=self)
             block1.block_init(x_lim, y_lim)
             self.add_stationary_item(block1)
             print('block', blocks, 'added')
             blocks -= 1
         while balls > 0:
-            ball1 = Ball()
+            ball1 = Ball(parent=self)
             ball1.ball_init(x_lim, y_lim)
             self.add_mobile_item(ball1)
             print('balls', balls, 'added')
@@ -226,10 +258,10 @@ class Screen:
                 yield item
 
     def get_resolution(self):
-        return int(x_resolution), int(y_resolution)
+        return self.x_resolution, self.y_resolution
 
     def get_max_coordinate(self):
-        return max(x_resolution, y_resolution)
+        return max(self.x_resolution, self.y_resolution)
 
     def get_new_object_id(self):
         self.lastObjectId += 1
@@ -244,15 +276,16 @@ class ScreenObject:
     WALLTYPE = 30
     VOIDTYPE = 0
 
-    def __init__(self, reference: list, relation: list, dimensions: list):
+    def __init__(self, reference: list, relation: list, dimensions: list, parent: object):
         self.set_position(reference)
         self.set_dimensions(relation, dimensions)
         self.set_color(sd.COLOR_YELLOW)
         self.set_width(1)
         self.isRemovable = False
         self.tillRemove = 10
-        self.objectId = window.get_new_object_id()
+        self.objectId = parent.get_new_object_id()
         self.objectType = self.VOIDTYPE
+        self.parent = parent
 
     def set_dimensions(self, relation: list, dimensions: list):
         self.xRelation = relation[0]
@@ -359,8 +392,8 @@ class MobileObject(ScreenObject):
     """Any screen item that changes its coordinates, checks collision
     draws itself"""
 
-    def __init__(self, reference: list, relation: list, dimensions: list):
-        super().__init__(reference, relation, dimensions)
+    def __init__(self, reference: list, relation: list, dimensions: list, parent: object):
+        super().__init__(reference, relation, dimensions, parent)
         self.set_speed(value=0, direction=0)
         self.wasContactBefore = 0
 
@@ -476,10 +509,10 @@ class MobileObject(ScreenObject):
     def die(self):
         x, y = self.get_position()
         sd.snowflake(sd.get_point(x, y), 40)
-        self.ball_init(*window.get_resolution())
+        self.ball_init(*self.parent.get_resolution())
 
     def mobile_object_init(self):
-        x = window.get_max_coordinate()
+        x = self.parent.get_max_coordinate()
         speed_limit = (int(x * 0.005), int(x * 0.008))
         speed_value = random.randint(*speed_limit)  # star before list unpacks the arguments
         speed_direction = random.randint(0, 360)
@@ -500,9 +533,9 @@ class MobileObject(ScreenObject):
 class Block(ScreenObject):
     """ rectangular static blocks """
 
-    def __init__(self, reference=[0, 0], dimensions=[1, 1]):
+    def __init__(self, parent: object, reference=[0, 0], dimensions=[1, 1]):
         relation = [0, 0]
-        super().__init__(reference, relation, dimensions)
+        super().__init__( parent, reference, relation, dimensions)
         self.init_points()
         self.set_obj_type(self.BLOCKTYPE)
 
@@ -531,10 +564,10 @@ class Block(ScreenObject):
 class Ball(MobileObject):
     """ mobile balls with radius """
 
-    def __init__(self, reference=[0, 0], radius=1):
+    def __init__(self, parent: object, reference=[0, 0], radius=1):
         relation = [radius, radius]
         dimensions = [radius * 2, radius * 2]
-        super().__init__(reference, relation, dimensions)
+        super().__init__(reference, relation, dimensions, parent)
         self.set_obj_type(self.BALLTYPE)
 
     def draw_item(self):
@@ -578,12 +611,5 @@ class Ball(MobileObject):
 
 # =====================================================================================
 
-x_resolution, y_resolution = 1600, 950
-
-window = Screen(x_size=x_resolution, y_size=y_resolution)
-window.screen_init(balls=48, blocks=6, wallWidth=4)
-
-while not sd.user_want_exit():
-    window.do()
-
-sd.quit()
+if __name__ == '__main__':
+    main()
