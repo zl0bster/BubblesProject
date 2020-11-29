@@ -114,11 +114,17 @@ class Screen:
         if isinstance(stat_item, ScreenObject) and not isinstance(stat_item, MobileObject):
             self.static_objects.append(stat_item)
 
-    def remove_mobile_item(self, mov_item):
-        if isinstance(mov_item, MobileObject):
-            itemName = id(mov_item)
-            self.mobile_objects.remove(mov_item)
+    def remove_mobile_item(self, item):
+        if isinstance(item, MobileObject):
+            itemName = id(item)
+            self.mobile_objects.remove(item)
             print(f'Mobile item {itemName} removed')
+
+    def remove_stationary_item(self, item):
+        if isinstance(item, MobileObject):
+            itemName = id(item)
+            self.static_objects.remove(item)
+            print(f'Static item {itemName} removed')
 
     def move_mobile_items(self):
         for dinObj in self.mobile_objects:
@@ -181,7 +187,7 @@ class Screen:
                         if mobObj.is_to_die_now():
                             mobObj.die()
                         if statObj.is_to_die_now():
-                            statObj.block_init(x_resolution, y_resolution)
+                            statObj.die()
                 else:
                     mobObj.lost_contact()
                 if mobObj.was_contact() > 2:
@@ -268,6 +274,7 @@ class Screen:
         while blocks > 0:
             block1 = Block(parent=self)
             block1.block_init(x_lim, y_lim)
+            block1.set_obj_type(block1.BLOCKTYPE)
             self.add_stationary_item(block1)
             print('block', blocks, 'added')
             blocks -= 1
@@ -320,6 +327,7 @@ class ScreenObject:
     parent field is stored to require window resolution and balls birthplace coordinates"""
     BALLTYPE = 10
     BLOCKTYPE = 20
+    BLOCKMORTALTYPE = 25
     WALLTYPE = 30
     VOIDTYPE = 0
 
@@ -434,6 +442,18 @@ class ScreenObject:
                 self.tillRemove -= 1
         return False
 
+    def die(self):
+        x, y = self.get_position()
+        dimension = 40
+        if self.get_obj_type() == self.BLOCKMORTALTYPE:
+            dimension = 60
+            self.parent.remove_stationary_item(self)
+        if self.get_obj_type() == self.BLOCKTYPE:
+            dimension = 80
+            self.block_init(*(self.parent.get_resolution()))
+        if self.get_obj_type() == self.BALLTYPE:
+            self.ball_init()
+        sd.snowflake(sd.get_point(x, y), dimension)
 
 class MobileObject(ScreenObject):
     """Any screen item that changes its coordinates, checks collision
@@ -553,10 +573,10 @@ class MobileObject(ScreenObject):
         self.yPosition += y
         return
 
-    def die(self):
-        x, y = self.get_position()
-        sd.snowflake(sd.get_point(x, y), 40)
-        self.ball_init()
+    # def die(self):
+    #     x, y = self.get_position()
+    #     sd.snowflake(sd.get_point(x, y), 40)
+    #     self.ball_init()
 
     def mobile_object_init(self):
         x = self.parent.get_max_coordinate()
