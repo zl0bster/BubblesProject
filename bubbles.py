@@ -17,6 +17,7 @@ from win32api import GetSystemMetrics
 import fractal_tree_draw as fd
 import transform_decart_ang as tda
 
+
 # todo refactor screen objects constructors
 # todo provide balls birth place while screen init
 # todo move screen class definition to another module
@@ -233,7 +234,8 @@ class Screen:
                       [(x_lim - 1 - wallWidth, 0), (x_lim - 1, y_lim - 1)],
                       [(wallWidth, y_lim - 1 - wallWidth), (x_lim - wallWidth, y_lim - 1)]]
         for wall in wallBlocks:
-            self.add_stationary_item(Block(wall[0], wall[1]), self)
+            blockTemp = Block(wall[0], wall[1], parent=self)
+            self.add_stationary_item(blockTemp)
             print('wall block', id(wall), 'added')
         for wallBlock in self.static_objects:
             wallBlock.set_width(2)
@@ -282,16 +284,16 @@ class ScreenObject:
     WALLTYPE = 30
     VOIDTYPE = 0
 
-    def __init__(self, reference: list, relation: list, dimensions: list, parent: object):
+    def __init__(self, reference: list, relation: list, dimensions: list, parent: object = None):
         self.set_position(reference)
         self.set_dimensions(relation, dimensions)
         self.set_color(sd.COLOR_YELLOW)
         self.set_width(1)
         self.isRemovable = False
         self.tillRemove = 10
+        self.parent = parent
         self.objectId = parent.get_new_object_id()
         self.objectType = self.VOIDTYPE
-        self.parent = parent
 
     def set_dimensions(self, relation: list, dimensions: list):
         self.xRelation = relation[0]
@@ -398,7 +400,7 @@ class MobileObject(ScreenObject):
     """Any screen item that changes its coordinates, checks collision
     draws itself"""
 
-    def __init__(self, reference: list, relation: list, dimensions: list, parent: object):
+    def __init__(self, reference: list, relation: list, dimensions: list, parent: object = None):
         super().__init__(reference, relation, dimensions, parent)
         self.set_speed(value=0, direction=0)
         self.wasContactBefore = 0
@@ -539,9 +541,9 @@ class MobileObject(ScreenObject):
 class Block(ScreenObject):
     """ rectangular static blocks """
 
-    def __init__(self, parent: object, reference=[0, 0], dimensions=[1, 1]):
+    def __init__(self, reference=[0, 0], dimensions=[1, 1], parent: object = None):
         relation = [0, 0]
-        super().__init__( parent, reference, relation, dimensions)
+        super().__init__( reference, relation, dimensions, parent)
         self.init_points()
         self.set_obj_type(self.BLOCKTYPE)
 
@@ -570,7 +572,7 @@ class Block(ScreenObject):
 class Ball(MobileObject):
     """ mobile balls with radius """
 
-    def __init__(self, parent: object, reference=[0, 0], radius=1):
+    def __init__(self, reference=[0, 0], radius=1, parent: object = None):
         relation = [radius, radius]
         dimensions = [radius * 2, radius * 2]
         super().__init__(reference, relation, dimensions, parent)
