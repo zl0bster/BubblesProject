@@ -18,7 +18,6 @@ import fractal_tree_draw as fd
 import transform_decart_ang as tda
 
 
-# todo refactor screen objects constructors
 # todo provide balls birth place while screen init
 # todo move screen class definition to another module
 # todo move screen objects definition to another file
@@ -43,6 +42,26 @@ def main():
 
 
 def parserDefinition():
+    """
+    command line arguments parse to adjust screen object parameters
+    :return:
+    parser data structure
+    screen resolution
+    definition mode: random or predefined
+    if random mode then returns number of balls and bricks
+    if predefined mode is set then
+
+    parser.xres : int  - screen resolution
+    parser.yres : int  - screen resolution
+    parser.mode : 'r' | 'd'
+    'r' - random mode:
+        parser.nba : int  - balls number
+        parser.nbr : int  - bricks number
+        sample:
+            python bubbles.py -x 1000 -y 600 r -nba 20 -nbr 4
+    'd' - random mode:
+        parser.file : str  - configuration file name
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('-x', '--xres', help='window x resolution', type=int, default=1600)
     parser.add_argument('-y', '--yres', help='window y resolution', type=int, default=950)
@@ -57,7 +76,8 @@ def parserDefinition():
 
 class Screen:
     """Keeps list of all screen objects and resolution ond manages all its items
-    provides movement, drawing, checking collisions and user interaction"""
+    provides movement, drawing, checking collisions and user interaction
+    """
 
     def __init__(self, x_size=800, y_size=600):
         width = GetSystemMetrics(0)
@@ -68,10 +88,15 @@ class Screen:
         self.mobile_objects = []
         self.static_objects = []
         self.lastObjectId = 0
+        self.ballBirthPlace = [[int(0.1 * self.x_resolution),
+                                int(0.1 * self.y_resolution)],
+                               [int(0.9 * self.x_resolution),
+                                int(0.9 * self.y_resolution)]]
         # self.contacting_items = {}
         sd.resolution = (self.x_resolution, self.y_resolution)
         # self.draw_screen_background()
         sd.take_background()
+        print(self.ballBirthPlace)
 
     def draw_screen_background(self):
         fd.fractal_tree(sd.get_point(int(self.x_resolution * 0.3),
@@ -124,6 +149,7 @@ class Screen:
         MIN_SPEED = 3
 
         def mobObjectChangeSpeedDirection(item: MobileObject, normalVector):
+            """ count a reflection angle"""
             [speedValue, direction] = item.get_speed()
             direction = tda.reflectance_angle(normalToSurface=normalVector, angle=direction)
             item.set_contact()
@@ -162,7 +188,7 @@ class Screen:
                     mobObjectDispersion(mobObj, normalVector)
                     # mobObjectChangeSpeed(item=mobObj, normalVector=normalVector)
                 if mobObj.is_inside(statObj):
-                    mobObj.ball_reset_position(x_resolution, y_resolution)
+                    mobObj.ball_reset_position()
         for i in range(0, len(self.mobile_objects) - 1):
             for j in range(i + 1, len(self.mobile_objects)):
                 mobObj1 = self.mobile_objects[i]
@@ -194,8 +220,7 @@ class Screen:
             if mobObj.is_out_of_window(self):
                 # if mobObj is Ball:
                 if type(mobObj) == Ball:
-                    x, y = self.get_resolution()
-                    mobObj.ball_init(x, y)
+                    mobObj.ball_init()
                     print(" Runaway ball is returned ")
 
     def check_mobile_item_is_immovable(self):
@@ -248,7 +273,11 @@ class Screen:
             blocks -= 1
         while balls > 0:
             ball1 = Ball(parent=self)
-            ball1.ball_init(x_lim, y_lim)
+            # bottomLeft = self.ballBirthPlace[0]
+            # topRight = self.ballBirthPlace[1]
+            # bottomLeft, topRight = self.get_birth_place()
+            # ball1.ball_init(bottomLeft, topRight)
+            ball1.ball_init()
             self.add_mobile_item(ball1)
             print('balls', balls, 'added')
             balls -= 1
@@ -275,10 +304,20 @@ class Screen:
         self.lastObjectId += 1
         return self.lastObjectId
 
+    def get_birth_place(self):
+        return self.ballBirthPlace[0], self.ballBirthPlace[1]
+
+    def set_birth_place(self, bottomLeft, topRight):
+        assert len(bottomLeft) == 2
+        assert len(topRight) == 2
+        self.ballBirthPlace[0] = list(bottomLeft)
+        self.ballBirthPlace[1] = list(topRight)
+
 
 class ScreenObject:
     """ Has initial point coordinates, reference of own center and dimensions
-    can be drawn with defined color and width"""
+    can be drawn with defined color and width
+    parent field is stored to require window resolution and balls birthplace coordinates"""
     BALLTYPE = 10
     BLOCKTYPE = 20
     WALLTYPE = 30
@@ -517,7 +556,7 @@ class MobileObject(ScreenObject):
     def die(self):
         x, y = self.get_position()
         sd.snowflake(sd.get_point(x, y), 40)
-        self.ball_init(*self.parent.get_resolution())
+        self.ball_init()
 
     def mobile_object_init(self):
         x = self.parent.get_max_coordinate()
@@ -543,7 +582,7 @@ class Block(ScreenObject):
 
     def __init__(self, reference=[0, 0], dimensions=[1, 1], parent: object = None):
         relation = [0, 0]
-        super().__init__( reference, relation, dimensions, parent)
+        super().__init__(reference, relation, dimensions, parent)
         self.init_points()
         self.set_obj_type(self.BLOCKTYPE)
 
@@ -570,7 +609,9 @@ class Block(ScreenObject):
 
 
 class Ball(MobileObject):
-    """ mobile balls with radius """
+    """ mobile balls with radius
+        radius value is stored in xRelation of screenObject
+    """
 
     def __init__(self, reference=[0, 0], radius=1, parent: object = None):
         relation = [radius, radius]
@@ -592,13 +633,13 @@ class Ball(MobileObject):
     def get_radius(self):
         return self.xRelation
 
-    def ball_init(self, x_lim, y_lim):
-        ''' define start position, speed and radius for bubble in window '''
+    def ball_init(self):
+        ''' define start position in birthplace coordinates received, speed and radius for bubble in window '''
         radius_limit = (16, 50)
         radius = random.randint(*radius_limit)
         self.mobile_object_init()
         self.set_radius(radius)
-        self.ball_reset_position(x_lim, y_lim)
+        self.ball_reset_position()
         self.set_lifetime(random.randint(20, 50))
         print(f"Ball {self.get_obj_id()} initialized")
 
@@ -606,12 +647,19 @@ class Ball(MobileObject):
         diameter = 2 * radius
         self.set_dimensions([radius, radius], [diameter, diameter])
 
-    def ball_reset_position(self, x_lim, y_lim):
-        wall_thickness = 5
-        x0 = self.xRelation + self.speedValue + wall_thickness
-        x_max = x_lim - self.xRelation - self.speedValue - wall_thickness
-        y0 = x0
-        y_max = y_lim - self.xRelation - self.speedValue - wall_thickness
+    def ball_reset_position(self):
+        # def ball_reset_position(self, x_lim, y_lim):
+        #     wall_thickness = 5
+
+        # x_lim = rightTop[0]
+        # y_lim = rightTop[1]
+        # x0 = leftBottom[0]
+        # y0 = leftBottom[1]
+        (x0, y0), (x_lim, y_lim) = self.parent.get_birth_place()
+        x0 += self.xRelation + self.speedValue  # + wall_thickness
+        y0 += self.xRelation + self.speedValue  # + wall_thickness
+        x_max = x_lim - self.xRelation - self.speedValue  # - wall_thickness
+        y_max = y_lim - self.xRelation - self.speedValue  # - wall_thickness
         self.screen_object_init(x0=x0, y0=y0, x_lim=x_max, y_lim=y_max)
         self.mobile_object_init()
         return
