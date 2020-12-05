@@ -6,6 +6,7 @@
 
 
 import argparse
+import csv
 import random
 import time
 from operator import itemgetter
@@ -17,11 +18,16 @@ from win32api import GetSystemMetrics
 import fractal_tree_draw as fd
 import transform_decart_ang as tda
 
-
-# todo provide balls birth place while screen init
 # todo move screen class definition to another module
 # todo move screen objects definition to another file
 # todo try to move screen creation to another file
+
+BALLTYPE = 10
+BLOCKTYPE = 20
+BLOCKMORTALTYPE = 25
+WALLTYPE = 30
+VOIDTYPE = 0
+BALLBIRTHPLACE = 40
 
 
 def main():
@@ -35,7 +41,15 @@ def main():
     if args.mode == 'r':
         ballsN = args.nba
         blocksN = args.nbr
-    window.screen_init(balls=ballsN, blocks=blocksN, wallWidth=4)
+        window.screen_rnd_init(balls=ballsN, blocks=blocksN, wallWidth=4)
+    if args.mode == 'd':
+        sceneFile = args.file.name
+        print(sceneFile)
+        window.screen_scene_init(sceneFile)
+        # window.screen_rnd_init(balls=ballsN, blocks=blocksN, wallWidth=4)
+    if args.mode == None:
+        print('activate default random scene')
+        window.screen_rnd_init(balls=ballsN, blocks=blocksN, wallWidth=4)
     while not sd.user_want_exit():
         window.do()
     sd.quit()
@@ -72,6 +86,27 @@ def parserDefinition():
     defParser = subparsers.add_parser('d')
     defParser.add_argument('-file', type=argparse.FileType('r'), help='scene config file path', required=True)
     return parser
+
+
+def scene_file_read(fileName):
+    """
+    Generator reads raws of CSV and transforms them to the dictionary
+    :returns
+    dict of read raw with keys from first raw"""
+    with open(fileName, 'r') as sceneFile:
+        rowReader = csv.reader(sceneFile, delimiter=';')
+        rowsNum = 0
+        dictKeys = []
+        for row in rowReader:
+            rowsNum += 1
+            if rowsNum == 1:
+                dictKeys = row
+                continue
+            # rowPre = map(str.replace(r, __old=',', __new='.'), r for r in row)
+            # resultDict = dict(zip(dictKeys, rowPre))
+            resultDict = dict(zip(dictKeys, row))
+            # print(resultDict)
+            yield resultDict
 
 
 class Screen:
@@ -121,7 +156,7 @@ class Screen:
             print(f'Mobile item {itemName} removed')
 
     def remove_stationary_item(self, item):
-        if isinstance(item, MobileObject):
+        if isinstance(item, Block):
             itemName = id(item)
             self.static_objects.remove(item)
             print(f'Static item {itemName} removed')
@@ -258,7 +293,7 @@ class Screen:
         if mouseState[2] != 0:
             self.export_mobile_items()
 
-    def screen_init(self, balls=3, blocks=1, wallWidth=3):
+    def screen_rnd_init(self, balls=3, blocks=1, wallWidth=3):
         x_lim, y_lim = self.get_resolution()
         wallBlocks = [[(0, 0), (wallWidth, y_lim - 1)],
                       [(wallWidth, 0), (x_lim - wallWidth, wallWidth)],
@@ -266,11 +301,10 @@ class Screen:
                       [(wallWidth, y_lim - 1 - wallWidth), (x_lim - wallWidth, y_lim - 1)]]
         for wall in wallBlocks:
             blockTemp = Block(wall[0], wall[1], parent=self)
+            blockTemp.set_width(2)
+            blockTemp.set_obj_type(WALLTYPE)
             self.add_stationary_item(blockTemp)
             print('wall block', id(wall), 'added')
-        for wallBlock in self.static_objects:
-            wallBlock.set_width(2)
-            wallBlock.set_obj_type(wallBlock.WALLTYPE)
         while blocks > 0:
             block1 = Block(parent=self)
             block1.block_init(x_lim, y_lim)
@@ -278,16 +312,56 @@ class Screen:
             self.add_stationary_item(block1)
             print('block', blocks, 'added')
             blocks -= 1
-        while balls > 0:
+        self.screen_balls_init(balls)
+
+    def screen_scene_init(self, fileName: str):
+        def block_coords_count(rowDict: dict):
+            x_lim, y_lim = self.get_resolution()
+            left = int(x_lim * float(rowDict['LEFT']))
+            right = int(x_lim * float(rowDict['RIGHT']))
+            bottom = int(y_lim * float(rowDict['BOTTOM']))
+            top = int(y_lim * float(rowDict['TOP']))
+            return [left, bottom], [right, top]
+
+        ballsNum = 5
+        sceneFile = scene_file_read(fileName)
+        for rowData in sceneFile:
+            objType = int(rowData['TYPE'])
+            bottomLeft, topRight = block_coords_count(rowData)
+            colorId = int(rowData['COLOR'])
+            thickness = int(rowData['THICKNESS'])
+            lives = int(rowData['LIVES'])
+            print(objType, rowData)
+            if objType == BALLBIRTHPLACE:
+                self.set_birth_place(bottomLeft, topRight)
+                ballsNum = lives
+                continue
+            if objType == WALLTYPE:
+                blockTemp = Block(bottomLeft, topRight, parent=self)
+                blockTemp.set_width(thickness)
+                blockTemp.set_color(blockTemp.get_palette_color(colorId))
+                blockTemp.set_obj_type(WALLTYPE)
+                self.add_stationary_item(blockTemp)
+                print('wall block', id(blockTemp), 'added')
+                continue
+            if objType == BLOCKMORTALTYPE:
+                blockTemp = Block(bottomLeft, topRight, parent=self)
+                blockTemp.set_width(thickness)
+                blockTemp.set_color(blockTemp.get_palette_color(colorId))
+                blockTemp.set_obj_type(BLOCKMORTALTYPE)
+                blockTemp.set_lifetime(lives)
+                self.add_stationary_item(blockTemp)
+                print('block', id(blockTemp), 'added')
+                continue
+        self.screen_balls_init(ballsNum=ballsNum)
+
+    def screen_balls_init(self, ballsNum):
+        while ballsNum > 0:
             ball1 = Ball(parent=self)
-            # bottomLeft = self.ballBirthPlace[0]
-            # topRight = self.ballBirthPlace[1]
-            # bottomLeft, topRight = self.get_birth_place()
-            # ball1.ball_init(bottomLeft, topRight)
             ball1.ball_init()
             self.add_mobile_item(ball1)
-            print('balls', balls, 'added')
-            balls -= 1
+            print('balls', ballsNum, 'added')
+            ballsNum -= 1
 
     def stat_items_issue(self, ignore=None):
         '''generates all stat items of screen object excepting ignored one'''
@@ -325,11 +399,12 @@ class ScreenObject:
     """ Has initial point coordinates, reference of own center and dimensions
     can be drawn with defined color and width
     parent field is stored to require window resolution and balls birthplace coordinates"""
-    BALLTYPE = 10
-    BLOCKTYPE = 20
-    BLOCKMORTALTYPE = 25
-    WALLTYPE = 30
-    VOIDTYPE = 0
+    BALLTYPE = BALLTYPE
+    BLOCKTYPE = BLOCKTYPE
+    BLOCKMORTALTYPE = BLOCKMORTALTYPE
+    WALLTYPE = WALLTYPE
+    VOIDTYPE = VOIDTYPE
+    BALLBIRTHPLACE = BALLBIRTHPLACE
 
     def __init__(self, reference: list, relation: list, dimensions: list, parent: object = None):
         self.set_position(reference)
@@ -362,6 +437,8 @@ class ScreenObject:
 
     def set_obj_type(self, objType: int):
         self.objectType = objType
+        if objType == BLOCKMORTALTYPE:
+            self.isRemovable = True
 
     def set_lifetime(self, x=10):
         self.isRemovable = True
@@ -406,6 +483,15 @@ class ScreenObject:
         color = palette[random.randint(0, color_count)]
         return color
 
+    def get_palette_color(self, colorId: int):
+        palette = [sd.COLOR_YELLOW,
+                   sd.COLOR_PURPLE,
+                   sd.COLOR_CYAN,
+                   sd.COLOR_GREEN]
+        colorNumber = colorId % (len(palette) - 1)
+        color = palette[colorNumber]
+        return color
+
     def get_obj_type(self):
         return self.objectType
 
@@ -429,7 +515,7 @@ class ScreenObject:
 
     def is_to_die_now(self):
         if self.isRemovable:
-            if self.tillRemove < 10:
+            if self.tillRemove < 6:
                 self.set_color(sd.COLOR_RED)
                 if type(self) is Ball:
                     self.set_radius(int(0.9 * self.get_radius()))
@@ -454,6 +540,7 @@ class ScreenObject:
         if self.get_obj_type() == self.BALLTYPE:
             self.ball_init()
         sd.snowflake(sd.get_point(x, y), dimension)
+
 
 class MobileObject(ScreenObject):
     """Any screen item that changes its coordinates, checks collision
@@ -668,13 +755,6 @@ class Ball(MobileObject):
         self.set_dimensions([radius, radius], [diameter, diameter])
 
     def ball_reset_position(self):
-        # def ball_reset_position(self, x_lim, y_lim):
-        #     wall_thickness = 5
-
-        # x_lim = rightTop[0]
-        # y_lim = rightTop[1]
-        # x0 = leftBottom[0]
-        # y0 = leftBottom[1]
         (x0, y0), (x_lim, y_lim) = self.parent.get_birth_place()
         x0 += self.xRelation + self.speedValue  # + wall_thickness
         y0 += self.xRelation + self.speedValue  # + wall_thickness
