@@ -22,6 +22,8 @@ import transform_decart_ang as tda
 # todo move screen objects definition to another file
 # todo try to move screen creation to another file
 
+# todo CSV has block coords bottomLeft and topRight and now is transformed to bottomLeft and xSize, ySize
+
 BALLTYPE = 10
 BLOCKTYPE = 20
 BLOCKMORTALTYPE = 25
@@ -46,7 +48,6 @@ def main():
         sceneFile = args.file.name
         print(sceneFile)
         window.screen_scene_init(sceneFile)
-        # window.screen_rnd_init(balls=ballsN, blocks=blocksN, wallWidth=4)
     if args.mode == None:
         print('activate default random scene')
         window.screen_rnd_init(balls=ballsN, blocks=blocksN, wallWidth=4)
@@ -296,10 +297,10 @@ class Screen:
 
     def screen_rnd_init(self, balls=3, blocks=1, wallWidth=3):
         x_lim, y_lim = self.get_resolution()
-        wallBlocks = [[(0, 0), (wallWidth, y_lim - 1)],
-                      [(wallWidth, 0), (x_lim - wallWidth, wallWidth)],
-                      [(x_lim - 1 - wallWidth, 0), (x_lim - 1, y_lim - 1)],
-                      [(wallWidth, y_lim - 1 - wallWidth), (x_lim - wallWidth, y_lim - 1)]]
+        wallBlocks = [[[0, 0], [wallWidth, y_lim - 1]],
+                      [[wallWidth, 0], [x_lim - wallWidth, wallWidth]],
+                      [[x_lim - 1 - wallWidth, 0], [x_lim - 1, y_lim - 1]],
+                      [[wallWidth, y_lim - 1 - wallWidth], [x_lim - wallWidth, y_lim - 1]]]
         for wall in wallBlocks:
             blockTemp = Block(wall[0], wall[1], parent=self)
             blockTemp.set_width(2)
@@ -338,6 +339,8 @@ class Screen:
                 self.set_birth_place(bottomLeft, topRight)
                 ballsNum = lives
                 continue
+            topRight[0] -= bottomLeft[0]
+            topRight[1] -= bottomLeft[1]
             if objType == WALLTYPE:
                 blockTemp = Block(bottomLeft, topRight, parent=self)
                 blockTemp.set_width(thickness)
@@ -348,6 +351,7 @@ class Screen:
                 print('wall block', id(blockTemp), 'added')
                 continue
             if objType == BLOCKMORTALTYPE:
+                print(objId, bottomLeft, topRight)
                 blockTemp = Block(bottomLeft, topRight, parent=self)
                 blockTemp.set_width(thickness)
                 blockTemp.set_color(blockTemp.get_palette_color(colorId))
@@ -573,13 +577,13 @@ class MobileObject(ScreenObject):
                  f" {self.wasContactBefore}"
         return export
 
-    def import_data(self, data: str):
-        parameters = split.data(',')
-        xPos, yPos, xRel, yRel, xDim, yDim, speedVal, speedDir, wasContactBefore = int(itemgetter(parameters))
-        self.set_position([xPos, yPos])
-        self.set_dimensions([xRel, yRel], [xDim, yDim])
-        self.set_speed(speedVal, speedDir)
-        self.wasContactBefore = wasContactBefore
+    # def import_data(self, data: str):
+    #     parameters = split.data(',')
+    #     xPos, yPos, xRel, yRel, xDim, yDim, speedVal, speedDir, wasContactBefore = int(itemgetter(parameters))
+    #     self.set_position([xPos, yPos])
+    #     self.set_dimensions([xRel, yRel], [xDim, yDim])
+    #     self.set_speed(speedVal, speedDir)
+    #     self.wasContactBefore = wasContactBefore
 
     def lost_contact(self):
         if self.wasContactBefore > 0:
