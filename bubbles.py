@@ -158,8 +158,9 @@ class Screen:
     def remove_stationary_item(self, item):
         if isinstance(item, Block):
             itemName = id(item)
-            self.static_objects.remove(item)
-            print(f'Static item {itemName} removed')
+            if item in self.static_objects:
+                self.static_objects.remove(item)
+                print(f'Static item {itemName} removed')
 
     def move_mobile_items(self):
         for dinObj in self.mobile_objects:
@@ -327,6 +328,7 @@ class Screen:
         sceneFile = scene_file_read(fileName)
         for rowData in sceneFile:
             objType = int(rowData['TYPE'])
+            objId = int(rowData['ID'])
             bottomLeft, topRight = block_coords_count(rowData)
             colorId = int(rowData['COLOR'])
             thickness = int(rowData['THICKNESS'])
@@ -342,6 +344,7 @@ class Screen:
                 blockTemp.set_color(blockTemp.get_palette_color(colorId))
                 blockTemp.set_obj_type(WALLTYPE)
                 self.add_stationary_item(blockTemp)
+                print(objId, bottomLeft, topRight)
                 print('wall block', id(blockTemp), 'added')
                 continue
             if objType == BLOCKMORTALTYPE:
